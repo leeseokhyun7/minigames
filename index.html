@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mini Games</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(255, 205, 97, 0.25), transparent 35%),
+        radial-gradient(circle at bottom right, rgba(100, 181, 246, 0.22), transparent 35%),
+        #111827;
+      color: #ffffff;
+      min-height: 100vh;
+    }
+
+    .wrap {
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 48px 20px 60px;
+    }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 13px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.1);
+      color: #d1d5db;
+      font-size: 13px;
+      margin-bottom: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(34px, 7vw, 68px);
+      line-height: 1;
+      letter-spacing: -0.05em;
+    }
+
+    .hero p {
+      margin: 18px auto 0;
+      max-width: 620px;
+      color: #cbd5e1;
+      font-size: 16px;
+      line-height: 1.7;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin: 30px auto 0;
+      flex-wrap: wrap;
+    }
+
+    .search {
+      width: min(420px, 100%);
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+      outline: none;
+      font-size: 15px;
+    }
+
+    .search::placeholder {
+      color: #94a3b8;
+    }
+
+    .game-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 18px;
+      margin-top: 34px;
+    }
+
+    .game-card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 190px;
+      padding: 22px;
+      border-radius: 24px;
+      text-decoration: none;
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.09);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      overflow: hidden;
+      transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+    }
+
+    .game-card:hover {
+      transform: translateY(-5px);
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.28);
+    }
+
+    .game-card::before {
+      content: "";
+      position: absolute;
+      width: 130px;
+      height: 130px;
+      right: -35px;
+      top: -35px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .game-no {
+      position: relative;
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 255, 255, 0.16);
+      font-weight: 800;
+      font-size: 16px;
+    }
+
+    .game-title {
+      position: relative;
+      margin: 22px 0 8px;
+      font-size: 21px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .game-desc {
+      position: relative;
+      color: #cbd5e1;
+      font-size: 14px;
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    .play-row {
+      position: relative;
+      margin-top: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #e5e7eb;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .arrow {
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    .empty {
+      display: none;
+      text-align: center;
+      color: #94a3b8;
+      margin-top: 40px;
+      font-size: 15px;
+    }
+
+    .footer {
+      margin-top: 44px;
+      text-align: center;
+      color: #64748b;
+      font-size: 13px;
+    }
+
+    @media (max-width: 520px) {
+      .wrap {
+        padding-top: 34px;
+      }
+
+      .game-card {
+        min-height: 170px;
+        border-radius: 20px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <div class="badge">🎮 Mini Games Collection</div>
+      <h1>미니게임 모음</h1>
+      <p>
+        원하는 게임을 골라 바로 플레이하세요.
+        새로운 게임은 1.html, 2.html, 3.html 형식으로 계속 추가됩니다.
+      </p>
+
+      <div class="toolbar">
+        <input
+          id="searchInput"
+          class="search"
+          type="search"
+          placeholder="게임 제목으로 검색"
+          autocomplete="off"
+        />
+      </div>
+    </section>
+
+    <section id="gameGrid" class="game-grid"></section>
+
+    <div id="emptyMessage" class="empty">
+      검색 결과가 없습니다.
+    </div>
+
+    <footer class="footer">
+      GitHub Pages Mini Games
+    </footer>
+  </main>
+
+  <script>
+    /*
+      게임을 추가할 때는 아래 배열에 한 줄만 추가하면 됩니다.
+
+      예시:
+      {
+        no: 5,
+        title: "새로운 게임",
+        desc: "짧은 게임 설명",
+        file: "5.html"
+      }
+    */
+
+    const games = [
+      {
+        no: 1,
+        title: "붕어빵 타이쿤",
+        desc: "손님 주문에 맞춰 붕어빵을 굽고 돈을 버는 타이쿤 게임",
+        file: "1.html"
+      },
+      {
+        no: 2,
+        title: "반응속도 테스트",
+        desc: "화면이 바뀌는 순간 빠르게 터치해서 기록을 세우는 게임",
+        file: "2.html"
+      },
+      {
+        no: 3,
+        title: "숫자 기억 게임",
+        desc: "짧게 보이는 숫자를 기억하고 맞히는 집중력 게임",
+        file: "3.html"
+      },
+      {
+        no: 4,
+        title: "장애물 피하기",
+        desc: "몰려오는 장애물을 피하면서 오래 버티는 아케이드 게임",
+        file: "4.html"
+      }
+    ];
+
+    const gameGrid = document.getElementById("gameGrid");
+    const searchInput = document.getElementById("searchInput");
+    const emptyMessage = document.getElementById("emptyMessage");
+
+    function renderGames(keyword) {
+      const searchText = (keyword || "").trim().toLowerCase();
+
+      const filteredGames = games.filter(function(game) {
+        return game.title.toLowerCase().indexOf(searchText) !== -1 ||
+               game.desc.toLowerCase().indexOf(searchText) !== -1 ||
+               String(game.no).indexOf(searchText) !== -1;
+      });
+
+      gameGrid.innerHTML = "";
+
+      filteredGames.forEach(function(game) {
+        const card = document.createElement("a");
+        card.className = "game-card";
+        card.href = game.file;
+
+        card.innerHTML =
+          '<div>' +
+            '<div class="game-no">' + game.no + '</div>' +
+            '<h2 class="game-title">' + escapeHtml(game.title) + '</h2>' +
+            '<p class="game-desc">' + escapeHtml(game.desc) + '</p>' +
+          '</div>' +
+          '<div class="play-row">' +
+            '<span>게임 시작</span>' +
+            '<span class="arrow">→</span>' +
+          '</div>';
+
+        gameGrid.appendChild(card);
+      });
+
+      emptyMessage.style.display = filteredGames.length === 0 ? "block" : "none";
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    searchInput.addEventListener("input", function() {
+      renderGames(searchInput.value);
+    });
+
+    renderGames("");
+  </script>
+</body>
+</html>

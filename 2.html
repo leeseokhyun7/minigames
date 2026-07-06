@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Precision Stack - Mockup</title>
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --panel: rgba(15, 20, 35, 0.85);
+    --accent: #4fd1ff;
+    --accent2: #ff5c7a;
+    --gold: #ffcf4d;
+    --text: #eef2ff;
+    --muted: #8b93b0;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    background: var(--bg);
+    font-family: -apple-system, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    overflow: hidden; color: var(--text);
+  }
+  #game-container { position: relative; width: 100%; height: 100vh; cursor: pointer; }
+  canvas { display: block; }
+
+  .hud {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 16px; pointer-events: none; z-index: 10;
+  }
+  .hud-card {
+    background: var(--panel); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px; padding: 10px 16px; backdrop-filter: blur(6px);
+  }
+  .score-card { font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
+  .score-card span { color: var(--accent); }
+  .best-card { font-size: 13px; color: var(--muted); }
+  .best-card b { color: var(--gold); }
+
+  .perfect-tag {
+    position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%) scale(0.7);
+    font-size: 30px; font-weight: 900; letter-spacing: 1px;
+    color: var(--gold); text-shadow: 0 0 18px rgba(255,207,77,0.7);
+    opacity: 0; transition: opacity 0.18s, transform 0.18s;
+    z-index: 10; pointer-events: none;
+  }
+  .perfect-tag.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+  .combo-tag {
+    position: absolute; top: 64px; left: 50%; transform: translateX(-50%);
+    font-size: 13px; font-weight: 700; color: var(--accent);
+    background: var(--panel); padding: 5px 16px; border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.08);
+    opacity: 0; transition: opacity 0.25s; z-index: 10; pointer-events: none;
+  }
+  .combo-tag.show { opacity: 1; }
+
+  .controls-hint {
+    position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
+    font-size: 12px; color: var(--muted); background: var(--panel);
+    padding: 7px 16px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);
+    z-index: 10; pointer-events: none;
+  }
+
+  .overlay {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(5,7,15,0.78); backdrop-filter: blur(4px);
+    z-index: 20; flex-direction: column; gap: 18px; text-align: center; padding: 24px;
+  }
+  .overlay.hidden { display: none; }
+  .overlay h1 {
+    font-size: 30px; margin: 0; letter-spacing: -0.5px;
+    background: linear-gradient(90deg, var(--gold), var(--accent2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .overlay p { margin: 0; color: var(--muted); font-size: 14px; max-width: 320px; line-height: 1.6; }
+  .big-stat { font-size: 46px; font-weight: 800; color: var(--text); }
+  .big-stat small { display: block; font-size: 13px; color: var(--muted); font-weight: 500; margin-top: 4px; }
+
+  .primary-btn {
+    background: linear-gradient(135deg, var(--gold), #ff9a4d);
+    color: #2a1500; border: none; padding: 14px 36px; border-radius: 30px;
+    font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px rgba(255,207,77,0.3);
+    transition: transform 0.12s;
+  }
+  .primary-btn:active { transform: scale(0.96); }
+
+  .ranking-panel {
+    background: var(--panel); border-radius: 16px; padding: 16px 20px;
+    width: 280px; border: 1px solid rgba(255,255,255,0.08); text-align: left;
+  }
+  .ranking-panel h3 {
+    margin: 0 0 10px 0; font-size: 13px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 1px; display: flex; justify-content: space-between;
+  }
+  .rank-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 0; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .rank-row:last-child { border-bottom: none; }
+  .rank-num {
+    width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; background: rgba(255,255,255,0.08); color: var(--muted);
+  }
+  .rank-row.me .rank-num { background: var(--gold); color: #2a1500; }
+  .rank-row.me { color: var(--gold); font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="game-container">
+  <div class="hud">
+    <div class="hud-card score-card">STACK <span id="score-val">0</span></div>
+    <div class="hud-card best-card">최고 <b id="best-val">0</b></div>
+  </div>
+  <div class="perfect-tag" id="perfect-tag">PERFECT!</div>
+  <div class="combo-tag" id="combo-tag">연속 PERFECT x<span id="combo-val">2</span></div>
+  <div class="controls-hint">화면을 탭해서 블록을 정확히 내려놓으세요</div>
+
+  <div class="overlay" id="start-overlay">
+    <h1>PRECISION STACK</h1>
+    <p>좌우로 움직이는 블록을 탭해서 쌓아올리세요.<br>어긋난 부분은 잘려나가고, 한 칸이라도 어긋나지 않으면 PERFECT!</p>
+    <button class="primary-btn" id="start-btn">쌓기 시작</button>
+    <div class="ranking-panel">
+      <h3>이번 주 랭킹 <span>WEEKLY</span></h3>
+      <div class="rank-row"><div style="display:flex;align-items:center;gap:8px"><div class="rank-num">1</div>한지우</div><div>87층</div></div>
+      <div class="rank-row"><div style="display:flex;align-items:center;gap:8px"><div class="rank-num">2</div>오세훈</div><div>74층</div></div>
+      <div class="rank-row"><div style="display:flex;align-items:center;gap:8px"><div class="rank-num">3</div>윤소영</div><div>61층</div></div>
+      <div class="rank-row me"><div style="display:flex;align-items:center;gap:8px"><div class="rank-num">15</div>나 (L)</div><div id="my-best">0층</div></div>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="gameover-overlay">
+    <h1>STACK COLLAPSED</h1>
+    <div class="big-stat" id="final-score">0층<small>이번 판 기록</small></div>
+    <p id="result-msg">블록이 완전히 어긋났습니다.</p>
+    <button class="primary-btn" id="retry-btn">다시 쌓기</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function() {
+  // ---------- CONFIG ----------
+  const BLOCK_H = 0.42;
+  const BASE_SIZE = 1.7;
+  const PERFECT_TOLERANCE = 0.045;   // 이 오차 이내면 PERFECT 처리
+  const MIN_VIABLE = 0.14;           // 이보다 겹침이 작으면 게임오버
+  let moveRange = 1.5;
+  let baseSpeed = 0.028;
+
+  let stack = [];          // {mesh, width, depth, x, z, axis}
+  let movingBlock = null;
+  let running = false;
+  let score = 0;
+  let combo = 0;
+  let myBest = 0;
+  let direction = 1;
+  let movePos = 0;
+  let axisToggle = 0; // 0: x축 이동, 1: z축 이동 (레이어마다 번갈음)
+  let fallingPieces = [];
+  let mascotAnim = { active: false, t: 0, duration: 14, start: new THREE.Vector3(), end: new THREE.Vector3(), peak: 0.55 };
+  let mascotSquash = 1;
+
+  // ---------- THREE SETUP ----------
+  const container = document.getElementById('game-container');
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x0b0f1a, 8, 26);
+
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(5.2, 4.2, 5.2);
+  camera.lookAt(0, 1.6, 0);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.1;
+  container.insertBefore(renderer.domElement, container.firstChild);
+
+  // sky gradient dome
+  const skyGeo = new THREE.SphereGeometry(60, 20, 14);
+  const topC = new THREE.Color(0x1c1430); const botC = new THREE.Color(0x35243f);
+  const sp = skyGeo.attributes.position; const cols = [];
+  for (let i = 0; i < sp.count; i++) {
+    const t = THREE.MathUtils.clamp((sp.getY(i) / 60 + 0.25), 0, 1);
+    const c = botC.clone().lerp(topC, t);
+    cols.push(c.r, c.g, c.b);
+  }
+  skyGeo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  const sky = new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false }));
+  scene.add(sky);
+
+  const ambient = new THREE.AmbientLight(0x6677aa, 0.65);
+  scene.add(ambient);
+  const dirLight = new THREE.DirectionalLight(0xffe9c2, 1.15);
+  dirLight.position.set(6, 10, 4);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.set(1024, 1024);
+  dirLight.shadow.camera.left = -4; dirLight.shadow.camera.right = 4;
+  dirLight.shadow.camera.top = 4; dirLight.shadow.camera.bottom = -4;
+  scene.add(dirLight);
+  const rimLight = new THREE.DirectionalLight(0x4fd1ff, 0.4);
+  rimLight.position.set(-6, 3, -4);
+  scene.add(rimLight);
+
+  // 타워 전체를 담는 그룹 — 블록이 쌓일 때마다 아래로 내려서 항상 꼭대기가 카메라 시야에 들어오게 함
+  const towerGroup = new THREE.Group();
+  scene.add(towerGroup);
+
+  function blockColor(i) {
+    const hue = (0.52 + i * 0.045) % 1;
+    return new THREE.Color().setHSL(hue, 0.6, 0.58);
+  }
+
+  function makeBlockMesh(width, depth, color) {
+    const geo = new THREE.BoxGeometry(width, BLOCK_H, depth);
+    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.15 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    const edge = new THREE.LineSegments(
+      new THREE.EdgesGeometry(geo),
+      new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 })
+    );
+    mesh.add(edge);
+    return mesh;
+  }
+
+  // ---------- MASCOT (꼭대기에 서 있는 캐릭터) ----------
+  const mascot = new THREE.Group();
+  scene.add(mascot);
+  const mBody = new THREE.Mesh(
+    new THREE.SphereGeometry(0.28, 24, 24),
+    new THREE.MeshPhysicalMaterial({ color: 0xffcf4d, emissive: 0x6a4a00, emissiveIntensity: 0.3, roughness: 0.3, metalness: 0.1, clearcoat: 0.5 })
+  );
+  mBody.castShadow = true;
+  mascot.add(mBody);
+  function mEye(x) {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(new THREE.SphereGeometry(0.065, 12, 12), new THREE.MeshStandardMaterial({ color: 0xffffff })));
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.036, 10, 10), new THREE.MeshBasicMaterial({ color: 0x1a1a2e }));
+    pupil.position.set(0, 0, 0.045);
+    g.add(pupil);
+    g.position.set(x, 0.05, 0.24);
+    return g;
+  }
+  mascot.add(mEye(-0.1), mEye(0.1));
+
+  // ---------- STACK LOGIC ----------
+  function startMovingBlock() {
+    const prev = stack[stack.length - 1];
+    const w = prev.width, d = prev.depth;
+    const axis = axisToggle % 2; // 0: x이동, 1: z이동
+    const color = blockColor(stack.length);
+    const mesh = makeBlockMesh(w, d, color);
+    const startPos = -moveRange;
+    if (axis === 0) {
+      mesh.position.set(startPos, stack.length * BLOCK_H, prev.z);
+    } else {
+      mesh.position.set(prev.x, stack.length * BLOCK_H, startPos);
+    }
+    towerGroup.add(mesh);
+    movePos = startPos;
+    direction = 1;
+    movingBlock = { mesh, width: w, depth: d, axis };
+  }
+
+  function resetGame() {
+    stack.forEach(s => towerGroup.remove(s.mesh));
+    fallingPieces.forEach(p => scene.remove(p.mesh));
+    if (movingBlock) towerGroup.remove(movingBlock.mesh);
+    stack = []; fallingPieces = []; movingBlock = null;
+    score = 0; combo = 0; axisToggle = 0;
+    moveRange = 1.5; baseSpeed = 0.028;
+    towerGroup.position.set(0, 0, 0);
+
+    const baseMesh = makeBlockMesh(BASE_SIZE, BASE_SIZE, new THREE.Color(0x355a78));
+    baseMesh.position.set(0, 0, 0);
+    towerGroup.add(baseMesh);
+    stack.push({ mesh: baseMesh, width: BASE_SIZE, depth: BASE_SIZE, x: 0, z: 0 });
+
+    mascot.position.set(0, BLOCK_H, 0);
+    mascot.rotation.set(0, 0, 0);
+    mascotAnim.active = false;
+    mascotSquash = 1;
+    updateHUD();
+    startMovingBlock();
+  }
+
+  function updateHUD() {
+    document.getElementById('score-val').textContent = score;
+    document.getElementById('best-val').textContent = myBest;
+  }
+
+  function showPerfect() {
+    const tag = document.getElementById('perfect-tag');
+    tag.classList.add('show');
+    clearTimeout(showPerfect._t);
+    showPerfect._t = setTimeout(() => tag.classList.remove('show'), 450);
+  }
+  function showCombo() {
+    if (combo < 2) return;
+    const tag = document.getElementById('combo-tag');
+    document.getElementById('combo-val').textContent = combo;
+    tag.classList.add('show');
+    clearTimeout(showCombo._t);
+    showCombo._t = setTimeout(() => tag.classList.remove('show'), 700);
+  }
+
+  function dropFallingPiece(width, depth, x, z, color, fallDir) {
+    const mesh = makeBlockMesh(width, depth, color);
+    mesh.position.set(x, stack.length * BLOCK_H, z);
+    mesh.userData = { vy: 0, vx: fallDir.x * 0.04, vz: fallDir.z * 0.04, vr: (Math.random() - 0.5) * 0.12 };
+    scene.add(mesh);
+    // 타워 그룹의 현재 오프셋을 보정해서 월드 좌표에 맞춤
+    mesh.position.y += towerGroup.position.y;
+    mesh.position.x += towerGroup.position.x;
+    fallingPieces.push({ mesh, life: 90 });
+  }
+
+  function placeBlock() {
+    if (!running || !movingBlock) return;
+    const prev = stack[stack.length - 1];
+    const mb = movingBlock;
+    let placedX, placedZ, placedW = mb.width, placedD = mb.depth;
+    let overlap, prevMin, prevMax, curMin, curMax, axisIsX = mb.axis === 0;
+
+    if (axisIsX) {
+      prevMin = prev.x - prev.width / 2; prevMax = prev.x + prev.width / 2;
+      curMin = mb.mesh.position.x - mb.width / 2; curMax = mb.mesh.position.x + mb.width / 2;
+    } else {
+      prevMin = prev.z - prev.depth / 2; prevMax = prev.z + prev.depth / 2;
+      curMin = mb.mesh.position.z - mb.depth / 2; curMax = mb.mesh.position.z + mb.depth / 2;
+    }
+    const overlapMin = Math.max(prevMin, curMin);
+    const overlapMax = Math.min(prevMax, curMax);
+    overlap = overlapMax - overlapMin;
+
+    if (overlap < MIN_VIABLE) {
+      // 완전히 어긋남 — 게임오버, 블록이 떨어짐
+      const fallDir = axisIsX ? { x: Math.sign(mb.mesh.position.x - prev.x) || 1, z: 0 } : { x: 0, z: Math.sign(mb.mesh.position.z - prev.z) || 1 };
+      dropFallingPiece(mb.width, mb.depth, mb.mesh.position.x, mb.mesh.position.z, mb.mesh.material.color, fallDir);
+      towerGroup.remove(mb.mesh);
+      movingBlock = null;
+      endGame('블록이 완전히 빗나갔습니다.');
+      return;
+    }
+
+    const fullMatch = (axisIsX ? (prev.width - overlap) : (prev.depth - overlap)) < PERFECT_TOLERANCE;
+
+    if (fullMatch) {
+      // PERFECT — 크기 유지, 잘리는 부분 없음
+      placedX = axisIsX ? prev.x : mb.mesh.position.x;
+      placedZ = axisIsX ? mb.mesh.position.z : prev.z;
+      placedW = axisIsX ? prev.width : mb.width;
+      placedD = axisIsX ? mb.depth : prev.depth;
+      combo++;
+      score += 2;
+      showPerfect();
+      showCombo();
+    } else {
+      // 일부만 겹침 — 겹친 부분만 살리고 나머지는 잘려서 낙하
+      const overlapCenter = (overlapMin + overlapMax) / 2;
+      if (axisIsX) {
+        placedX = overlapCenter; placedZ = prev.z;
+        placedW = overlap; placedD = prev.depth;
+        // 잘려나간 조각
+        const cutWidth = mb.width - overlap;
+        const cutCenter = curMax > overlapMax ? (overlapMax + curMax) / 2 : (curMin + overlapMin) / 2;
+        const fallDir = { x: cutCenter > overlapCenter ? 1 : -1, z: 0 };
+        dropFallingPiece(cutWidth, mb.depth, cutCenter, mb.mesh.position.z, mb.mesh.material.color, fallDir);
+      } else {
+        placedX = prev.x; placedZ = overlapCenter;
+        placedW = prev.width; placedD = overlap;
+        const cutDepth = mb.depth - overlap;
+        const cutCenter = curMax > overlapMax ? (overlapMax + curMax) / 2 : (curMin + overlapMin) / 2;
+        const fallDir = { x: 0, z: cutCenter > overlapCenter ? 1 : -1 };
+        dropFallingPiece(mb.width, cutDepth, mb.mesh.position.x, cutCenter, mb.mesh.material.color, fallDir);
+      }
+      combo = 0;
+      score += 1;
+    }
+
+    towerGroup.remove(mb.mesh);
+    const placedMesh = makeBlockMesh(placedW, placedD, mb.mesh.material.color);
+    placedMesh.position.set(placedX, stack.length * BLOCK_H, placedZ);
+    towerGroup.add(placedMesh);
+    stack.push({ mesh: placedMesh, width: placedW, depth: placedD, x: placedX, z: placedZ });
+
+    movingBlock = null;
+    axisToggle++;
+    baseSpeed = Math.min(baseSpeed + 0.0009, 0.062);
+    updateHUD();
+
+    // 타워를 한 칸 내려서 다음 블록도 항상 같은 카메라 높이에서 보이게
+    towerGroup.position.y -= BLOCK_H;
+    const landY = (stack.length - 1) * BLOCK_H + BLOCK_H + towerGroup.position.y;
+    mascotAnim.start.copy(mascot.position);
+    mascotAnim.end.set(placedX, landY, placedZ);
+    mascotAnim.t = 0;
+    mascotAnim.duration = fullMatch ? 12 : 16; // PERFECT면 더 경쾌하게 짧은 점프
+    mascotAnim.peak = fullMatch ? 0.42 : 0.6;
+    mascotAnim.active = true;
+
+    if (placedW < 0.22 || placedD < 0.22) {
+      endGame('블록이 너무 작아져서 더 쌓을 수 없습니다.');
+      return;
+    }
+
+    startMovingBlock();
+  }
+
+  function endGame(msg) {
+    running = false;
+    if (stack.length - 1 > myBest) {
+      myBest = stack.length - 1;
+      document.getElementById('my-best').textContent = myBest + '층';
+    }
+    document.getElementById('final-score').innerHTML = (stack.length - 1) + '층<small>최고 콤보 ' + combo + '</small>';
+    document.getElementById('result-msg').textContent = msg;
+    document.getElementById('gameover-overlay').classList.remove('hidden');
+  }
+
+  function startGame() {
+    document.getElementById('start-overlay').classList.add('hidden');
+    document.getElementById('gameover-overlay').classList.add('hidden');
+    resetGame();
+    running = true;
+  }
+
+  // ---------- INPUT ----------
+  function handleTap() { if (running) placeBlock(); }
+  renderer.domElement.addEventListener('click', handleTap);
+  window.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); handleTap(); } });
+
+  // ---------- ANIMATE ----------
+  function animate() {
+    requestAnimationFrame(animate);
+
+    if (running && movingBlock) {
+      movePos += direction * baseSpeed;
+      if (movePos > moveRange) { movePos = moveRange; direction = -1; }
+      if (movePos < -moveRange) { movePos = -moveRange; direction = 1; }
+      if (movingBlock.axis === 0) movingBlock.mesh.position.x = movePos;
+      else movingBlock.mesh.position.z = movePos;
+
+      // 점프 중이 아닐 때만 대기 모션(좌우로 살짝 움찔)
+      if (!mascotAnim.active) {
+        const t = performance.now() * 0.004;
+        mascot.rotation.y = Math.sin(t) * 0.15;
+      }
+    }
+
+    // 마스코트 점프 애니메이션 (포물선 궤적 + 착지 스쿼시)
+    if (mascotAnim.active) {
+      mascotAnim.t++;
+      let p = mascotAnim.t / mascotAnim.duration;
+      if (p >= 1) { p = 1; mascotAnim.active = false; mascotSquash = 0.55; }
+      const arc = Math.sin(p * Math.PI) * mascotAnim.peak;
+      mascot.position.lerpVectors(mascotAnim.start, mascotAnim.end, p);
+      mascot.position.y += arc;
+      mascot.rotation.x = -Math.sin(p * Math.PI) * 0.5; // 점프 중 앞으로 살짝 숙이는 자세
+      mascot.rotation.y *= 0.9; // 점프 중엔 좌우 움찔 모션 빠르게 감쇠
+    } else {
+      mascot.rotation.x += (0 - mascot.rotation.x) * 0.25; // 착지 후 자세 복귀
+    }
+    mascotSquash += (1 - mascotSquash) * 0.2;
+    mBody.scale.set(1 / Math.sqrt(mascotSquash), mascotSquash, 1 / Math.sqrt(mascotSquash));
+
+    // 잘려나간 조각들 물리 낙하 애니메이션
+    fallingPieces = fallingPieces.filter(p => {
+      p.mesh.userData.vy -= 0.012;
+      p.mesh.position.y += p.mesh.userData.vy;
+      p.mesh.position.x += p.mesh.userData.vx;
+      p.mesh.position.z += p.mesh.userData.vz;
+      p.mesh.rotation.x += p.mesh.userData.vr;
+      p.mesh.rotation.z += p.mesh.userData.vr * 0.6;
+      p.life--;
+      if (p.life <= 0) { scene.remove(p.mesh); return false; }
+      return true;
+    });
+
+    // 카메라가 살짝 부드럽게 타워 회전을 따라가는 느낌 (고정 시점 + 미세한 틸트)
+    camera.lookAt(0, 1.6 + towerGroup.position.y * 0, 0);
+
+    renderer.render(scene, camera);
+  }
+
+  document.getElementById('start-btn').addEventListener('click', startGame);
+  document.getElementById('retry-btn').addEventListener('click', startGame);
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // initial idle preview
+  const idleBase = makeBlockMesh(BASE_SIZE, BASE_SIZE, new THREE.Color(0x355a78));
+  towerGroup.add(idleBase);
+  stack.push({ mesh: idleBase, width: BASE_SIZE, depth: BASE_SIZE, x: 0, z: 0 });
+  mascot.position.set(0, BLOCK_H, 0);
+
+  animate();
+})();
+</script>
+</body>
+</html>

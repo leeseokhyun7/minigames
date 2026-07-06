@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>3D Roll Survival - Mockup</title>
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --panel: rgba(15, 20, 35, 0.85);
+    --accent: #4fd1ff;
+    --accent2: #ff5c7a;
+    --gold: #ffcf4d;
+    --text: #eef2ff;
+    --muted: #8b93b0;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    background: var(--bg);
+    font-family: -apple-system, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    overflow: hidden;
+    color: var(--text);
+  }
+  #game-container { position: relative; width: 100%; height: 100vh; }
+  canvas { display: block; }
+
+  .hud {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 16px; pointer-events: none; z-index: 10;
+  }
+  .hud-card {
+    background: var(--panel);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 10px 16px;
+    backdrop-filter: blur(6px);
+  }
+  .score-card { font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
+  .score-card span { color: var(--accent); }
+  .coin-card { display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 600; }
+  .coin-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+
+  .difficulty-badge {
+    position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+    background: var(--panel); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px; padding: 6px 18px; font-size: 13px; color: var(--muted);
+    z-index: 10; pointer-events: none;
+  }
+  .difficulty-badge b { color: var(--accent2); }
+
+  .controls-hint {
+    position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 10px; z-index: 10;
+  }
+  .ctrl-btn {
+    width: 56px; height: 56px; border-radius: 16px;
+    background: var(--panel); border: 1px solid rgba(255,255,255,0.12);
+    color: var(--text); font-size: 22px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+    transition: transform 0.08s, background 0.15s;
+  }
+  .ctrl-btn:active { transform: scale(0.92); background: rgba(79,209,255,0.25); }
+
+  .overlay {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(5,7,15,0.78); backdrop-filter: blur(4px);
+    z-index: 20; flex-direction: column; gap: 18px; text-align: center; padding: 24px;
+  }
+  .overlay.hidden { display: none; }
+  .overlay h1 {
+    font-size: 30px; margin: 0; letter-spacing: -0.5px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .overlay p { margin: 0; color: var(--muted); font-size: 14px; max-width: 320px; line-height: 1.6; }
+  .big-stat { font-size: 46px; font-weight: 800; color: var(--text); }
+  .big-stat small { display: block; font-size: 13px; color: var(--muted); font-weight: 500; margin-top: 4px; }
+
+  .primary-btn {
+    background: linear-gradient(135deg, var(--accent), #2b9cff);
+    color: #06121f; border: none; padding: 14px 36px; border-radius: 30px;
+    font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px rgba(79,209,255,0.35);
+    transition: transform 0.12s;
+  }
+  .primary-btn:active { transform: scale(0.96); }
+
+  .ranking-panel {
+    background: var(--panel); border-radius: 16px; padding: 16px 20px;
+    width: 280px; border: 1px solid rgba(255,255,255,0.08); text-align: left;
+  }
+  .ranking-panel h3 {
+    margin: 0 0 10px 0; font-size: 13px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 1px; display: flex; justify-content: space-between;
+  }
+  .rank-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 0; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .rank-row:last-child { border-bottom: none; }
+  .rank-num {
+    width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; background: rgba(255,255,255,0.08); color: var(--muted);
+  }
+  .rank-row.me .rank-num { background: var(--accent); color: #06121f; }
+  .rank-row.me { color: var(--accent); font-weight: 700; }
+
+  .ai-tag {
+    position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; color: var(--muted); background: var(--panel);
+    padding: 5px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);
+    opacity: 0; transition: opacity 0.4s; z-index: 10; pointer-events: none;
+  }
+  .ai-tag.show { opacity: 1; }
+  .ai-tag b { color: var(--gold); }
+</style>
+</head>
+<body>
+<div id="game-container">
+  <div class="hud">
+    <div class="hud-card score-card">DIST <span id="score-val">0</span>m</div>
+    <div class="hud-card coin-card"><div class="coin-dot"></div><span id="coin-val">0</span></div>
+  </div>
+  <div class="difficulty-badge">난이도 <b id="diff-val">1</b> 단계 · AI 동적 생성 맵</div>
+  <div class="ai-tag" id="ai-tag">🤖 <b>AI</b>가 다음 구간 장애물 패턴을 생성 중...</div>
+
+  <div class="controls-hint">
+    <div class="ctrl-btn" id="btn-left">◀</div>
+    <div class="ctrl-btn" id="btn-right">▶</div>
+  </div>
+
+  <div class="overlay" id="start-overlay">
+    <h1>3D ROLL SURVIVAL</h1>
+    <p>좌우로 차선을 바꿔 장애물을 피하세요.<br>매 판 AI가 새로운 장애물 패턴을 생성합니다.</p>
+    <button class="primary-btn" id="start-btn">게임 시작</button>
+    <div class="ranking-panel">
+      <h3>이번 주 랭킹 <span>WEEKLY</span></h3>
+      <div class="rank-row"><div style="display:flex;align-items:center;gap:8px"><div class="rank-num">1</div>지수민</div><div>842m</div></div>
+      <div class="rank-row"><div style="display:flex;align-items:center;gap:8px"><div class="rank-num">2</div>박준영</div><div>791m</div></div>
+      <div class="rank-row"><div style="display:flex;align-items:center;gap:8px"><div class="rank-num">3</div>최하늘</div><div>703m</div></div>
+      <div class="rank-row me"><div style="display:flex;align-items:center;gap:8px"><div class="rank-num">12</div>나 (L)</div><div id="my-best">0m</div></div>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="gameover-overlay">
+    <h1>RUN COMPLETE</h1>
+    <div class="big-stat" id="final-score">0m<small>이번 판 기록</small></div>
+    <p id="result-msg">장애물에 부딪혔습니다.</p>
+    <button class="primary-btn" id="retry-btn">다시 달리기</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function() {
+  const LANE_X = [-4.4, -2.2, 0, 2.2, 4.4];
+  let lane = 2;
+  let targetLane = 2;
+  let speed = 0.22;
+  let baseSpeed = 0.22;
+  let distance = 0;
+  let coins = 0;
+  let difficulty = 1;
+  let running = false;
+  let myBest = 0;
+  let obstacleMeshes = [];
+  let coinMeshes = [];
+  let spawnedZ = 0; // furthest z spawned so far (negative direction)
+  let nextChunkAt = -30;
+
+  // ---------- THREE SETUP ----------
+  const container = document.getElementById('game-container');
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x0b0f1a, 10, 55);
+
+  const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 200);
+  camera.position.set(0, 6.2, 9.5);
+  camera.lookAt(0, 0.5, -5);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.15;
+  container.insertBefore(renderer.domElement, container.firstChild);
+
+  // ---- Sky dome (gradient via vertex colors) ----
+  const skyGeo = new THREE.SphereGeometry(120, 24, 16);
+  const skyColorTop = new THREE.Color(0x141b33);
+  const skyColorBottom = new THREE.Color(0x4a2e57);
+  const skyPos = skyGeo.attributes.position;
+  const skyColors = [];
+  for (let i = 0; i < skyPos.count; i++) {
+    const y = skyPos.getY(i) / 120;
+    const t = THREE.MathUtils.clamp((y + 0.3) / 1.0, 0, 1);
+    const c = skyColorBottom.clone().lerp(skyColorTop, t);
+    skyColors.push(c.r, c.g, c.b);
+  }
+  skyGeo.setAttribute('color', new THREE.Float32BufferAttribute(skyColors, 3));
+  const skyMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false });
+  const sky = new THREE.Mesh(skyGeo, skyMat);
+  scene.add(sky);
+
+  // ---- Drifting ambient particles (dust / fireflies) ----
+  const dustCount = 140;
+  const dustGeo = new THREE.BufferGeometry();
+  const dustPos = new Float32Array(dustCount * 3);
+  for (let i = 0; i < dustCount; i++) {
+    dustPos[i * 3] = (Math.random() - 0.5) * 30;
+    dustPos[i * 3 + 1] = Math.random() * 12;
+    dustPos[i * 3 + 2] = -Math.random() * 200;
+  }
+  dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+  const dustMat = new THREE.PointsMaterial({ color: 0x9fd8ff, size: 0.18, transparent: true, opacity: 0.55, depthWrite: false });
+  const dust = new THREE.Points(dustGeo, dustMat);
+  scene.add(dust);
+
+  const ambient = new THREE.AmbientLight(0x6677aa, 0.55);
+  scene.add(ambient);
+  const dirLight = new THREE.DirectionalLight(0x9fd8ff, 1.3);
+  dirLight.position.set(5, 14, 8);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.set(1024, 1024);
+  dirLight.shadow.camera.left = -7.5;
+  dirLight.shadow.camera.right = 7.5;
+  dirLight.shadow.camera.top = 10;
+  dirLight.shadow.camera.bottom = -30;
+  dirLight.shadow.camera.far = 40;
+  scene.add(dirLight);
+  const rimLight = new THREE.DirectionalLight(0xff5c7a, 0.5);
+  rimLight.position.set(-6, 4, -10);
+  scene.add(rimLight);
+  const fillLight = new THREE.PointLight(0xffcf4d, 0.4, 12);
+  fillLight.position.set(0, 3, 4);
+  scene.add(fillLight);
+
+  // ---- Track ----
+  const trackGeo = new THREE.PlaneGeometry(13, 400, 1, 80);
+  const trackMat = new THREE.MeshStandardMaterial({ color: 0x121829, roughness: 0.85, metalness: 0.15 });
+  const track = new THREE.Mesh(trackGeo, trackMat);
+  track.rotation.x = -Math.PI / 2;
+  track.position.z = -180;
+  track.receiveShadow = true;
+  scene.add(track);
+
+  // Subtle cross-tread lines on the track for a sense of speed
+  const treadGroup = new THREE.Group();
+  for (let i = 0; i < 60; i++) {
+    const tGeo = new THREE.PlaneGeometry(12.6, 0.12);
+    const tMat = new THREE.MeshBasicMaterial({ color: 0x1c2640, transparent: true, opacity: 0.6 });
+    const tread = new THREE.Mesh(tGeo, tMat);
+    tread.rotation.x = -Math.PI / 2;
+    tread.position.set(0, 0.011, -i * 6.5);
+    treadGroup.add(tread);
+  }
+  scene.add(treadGroup);
+
+  // Lane divider lines (glowing) - 4 dividers between 5 lanes
+  const laneLines = [];
+  for (let lx of [-3.3, -1.1, 1.1, 3.3]) {
+    const lineGeo = new THREE.PlaneGeometry(0.07, 400);
+    const lineMat = new THREE.MeshBasicMaterial({ color: 0x4fd1ff, transparent: true, opacity: 0.5 });
+    const line = new THREE.Mesh(lineGeo, lineMat);
+    line.rotation.x = -Math.PI / 2;
+    line.position.set(lx, 0.015, -180);
+    scene.add(line);
+    laneLines.push(line);
+  }
+
+  // ---- Side rail decoration (glowing pillars) ----
+  const railGroup = new THREE.Group();
+  for (let i = 0; i < 50; i++) {
+    [-6.9, 6.9].forEach((sx) => {
+      const pGeo = new THREE.CylinderGeometry(0.05, 0.05, 1.6 + Math.random() * 1.2, 6);
+      const pMat = new THREE.MeshStandardMaterial({ color: 0x2c3a5c, emissive: 0x1a3550, emissiveIntensity: 0.6, roughness: 0.5 });
+      const pillar = new THREE.Mesh(pGeo, pMat);
+      pillar.position.set(sx, 0.8, -i * 8 + 4);
+      railGroup.add(pillar);
+    });
+  }
+  scene.add(railGroup);
+
+  // ---- Player: forward-facing running mascot (legs/arms swing, forward lean) ----
+  const player = new THREE.Group();
+  player.position.set(0, 0.5, 0);
+  player.rotation.x = -0.12; // 달리는 느낌의 약간 앞으로 쏠린 자세
+  scene.add(player);
+
+  const bodyGroup = new THREE.Group(); // 몸통+얼굴+안테나 (다리/팔과 별도로 통통 튀는 바운스 적용)
+  player.add(bodyGroup);
+
+  // 둥근 마스코트 몸체
+  const coreGeo = new THREE.SphereGeometry(0.46, 32, 32);
+  const coreMat = new THREE.MeshPhysicalMaterial({
+    color: 0x4fd1ff, emissive: 0x0d4f66, emissiveIntensity: 0.35,
+    roughness: 0.35, metalness: 0.05, clearcoat: 0.4, clearcoatRoughness: 0.3,
+  });
+  const core = new THREE.Mesh(coreGeo, coreMat);
+  core.castShadow = true;
+  bodyGroup.add(core);
+
+  // 눈 — 진행 방향(-Z, 화면 안쪽)을 바라보도록 배치
+  function makeEye(x) {
+    const eyeGroup = new THREE.Group();
+    const whiteGeo = new THREE.SphereGeometry(0.105, 16, 16);
+    const whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
+    eyeGroup.add(new THREE.Mesh(whiteGeo, whiteMat));
+
+    const pupilGeo = new THREE.SphereGeometry(0.058, 12, 12);
+    const pupilMat = new THREE.MeshBasicMaterial({ color: 0x1a1a2e });
+    const pupil = new THREE.Mesh(pupilGeo, pupilMat);
+    pupil.position.set(0, 0, -0.06); // -Z 방향으로 돌출 = 전방 응시
+    eyeGroup.add(pupil);
+
+    const highlightGeo = new THREE.SphereGeometry(0.02, 8, 8);
+    const highlightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const highlight = new THREE.Mesh(highlightGeo, highlightMat);
+    highlight.position.set(0.022, 0.022, -0.1);
+    eyeGroup.add(highlight);
+
+    eyeGroup.position.set(x, 0.1, -0.4);
+    return eyeGroup;
+  }
+  bodyGroup.add(makeEye(-0.16));
+  bodyGroup.add(makeEye(0.16));
+
+  // 볼터치
+  function makeBlush(x) {
+    const blushGeo = new THREE.SphereGeometry(0.08, 12, 12);
+    blushGeo.scale(1, 0.6, 0.4);
+    const blushMat = new THREE.MeshBasicMaterial({ color: 0xff9eb5, transparent: true, opacity: 0.55 });
+    const blush = new THREE.Mesh(blushGeo, blushMat);
+    blush.position.set(x, -0.05, -0.38);
+    return blush;
+  }
+  bodyGroup.add(makeBlush(-0.29));
+  bodyGroup.add(makeBlush(0.29));
+
+  // 입 (진행 방향으로 활짝 웃는 표정)
+  const mouthGeo = new THREE.TorusGeometry(0.085, 0.018, 8, 16, Math.PI);
+  const mouthMat = new THREE.MeshBasicMaterial({ color: 0x1a1a2e });
+  const mouth = new THREE.Mesh(mouthGeo, mouthMat);
+  mouth.position.set(0, -0.11, -0.42);
+  mouth.rotation.set(Math.PI, 0, Math.PI);
+  bodyGroup.add(mouth);
+
+  // 머리 위 안테나
+  const antennaStemGeo = new THREE.CylinderGeometry(0.017, 0.017, 0.2, 8);
+  const antennaMat = new THREE.MeshStandardMaterial({ color: 0xffcf4d, emissive: 0x6a4a00, emissiveIntensity: 0.4 });
+  const antennaStem = new THREE.Mesh(antennaStemGeo, antennaMat);
+  antennaStem.position.set(0, 0.52, 0.05);
+  antennaStem.rotation.x = -0.3; // 뒤로 살짝 휘날리는 각도
+  bodyGroup.add(antennaStem);
+  const antennaTipGeo = new THREE.SphereGeometry(0.055, 12, 12);
+  const antennaTip = new THREE.Mesh(antennaTipGeo, antennaMat);
+  antennaTip.position.set(0, 0.62, -0.07);
+  bodyGroup.add(antennaTip);
+
+  // 팔/다리용 캡슐형 림(스피어를 늘려 사용) 생성 헬퍼
+  function makeLimb(radius, length, color) {
+    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.45, metalness: 0.05 });
+    const limb = new THREE.Mesh(new THREE.SphereGeometry(radius, 14, 14), mat);
+    limb.scale.set(1, length / radius, 1);
+    limb.castShadow = true;
+    return limb;
+  }
+
+  // 다리 (힙 피벗 그룹으로 감싸서 앞뒤 스윙)
+  function makeLeg(x) {
+    const pivot = new THREE.Group();
+    pivot.position.set(x, -0.32, 0);
+    const leg = makeLimb(0.1, 0.22, 0x2c6e8c);
+    leg.position.set(0, -0.18, 0);
+    pivot.add(leg);
+    const foot = new THREE.Mesh(new THREE.SphereGeometry(0.085, 10, 10), new THREE.MeshStandardMaterial({ color: 0xffcf4d, roughness: 0.4 }));
+    foot.position.set(0, -0.34, 0.04);
+    pivot.add(foot);
+    return pivot;
+  }
+  const legL = makeLeg(-0.17);
+  const legR = makeLeg(0.17);
+  player.add(legL, legR);
+
+  // 팔 (어깨 피벗)
+  function makeArm(x) {
+    const pivot = new THREE.Group();
+    pivot.position.set(x, 0.08, 0);
+    const arm = makeLimb(0.075, 0.2, 0x4fd1ff);
+    arm.position.set(0, -0.16, 0);
+    pivot.add(arm);
+    return pivot;
+  }
+  const armL = makeArm(-0.42);
+  const armR = makeArm(0.42);
+  bodyGroup.add(armL, armR);
+
+  const glowGeo = new THREE.SphereGeometry(0.7, 16, 16);
+  const glowMat = new THREE.MeshBasicMaterial({ color: 0x4fd1ff, transparent: true, opacity: 0.06 });
+  const glow = new THREE.Mesh(glowGeo, glowMat);
+  bodyGroup.add(glow);
+
+  // particle trail behind player
+  const trailCount = 16;
+  const trailMeshes = [];
+  const trailGeoSrc = new THREE.SphereGeometry(0.14, 6, 6);
+  for (let i = 0; i < trailCount; i++) {
+    const tMat = new THREE.MeshBasicMaterial({ color: 0x4fd1ff, transparent: true, opacity: 0 });
+    const t = new THREE.Mesh(trailGeoSrc, tMat);
+    scene.add(t);
+    trailMeshes.push({ mesh: t, life: 0 });
+  }
+  let trailCursor = 0;
+
+  function resetWorld() {
+    obstacleMeshes.forEach(m => scene.remove(m));
+    coinMeshes.forEach(m => scene.remove(m));
+    obstacleMeshes = [];
+    coinMeshes = [];
+    distance = 0;
+    coins = 0;
+    difficulty = 1;
+    speed = baseSpeed;
+    lane = 2; targetLane = 2;
+    player.position.set(0, 0.5, 0);
+    spawnedZ = 0;
+    nextChunkAt = -30;
+    trailMeshes.forEach(t => { t.life = 0; t.mesh.material.opacity = 0; });
+    updateHUD();
+  }
+
+  // ---------- "AI" PROCEDURAL GENERATION (mock of Claude API call) ----------
+  // 실제 구현에서는 이 함수가 서버를 거쳐 클로드 API를 호출하고 JSON을 받아옵니다.
+  // 목업에서는 동일한 규칙(최소 1차선 개방, 최소 간격, 난이도별 밀도)을 로컬 로직으로 시뮬레이션합니다.
+  function generateChunk(startZ, diff) {
+    const layout = [];
+    const count = Math.min(4 + Math.floor(diff * 0.8), 10);
+    const minGap = Math.max(9 - diff * 0.3, 5.5);
+    let z = startZ - 14;
+    let lastLane = -1;
+    let sameLaneStreak = 0;
+
+    for (let i = 0; i < count; i++) {
+      let blockedLanes = new Set();
+      // 5레인 기준 난이도별 차단 차선 수 (항상 최소 2개 차선은 열어둠)
+      const numBlocked = diff < 4 ? 1 : diff < 8 ? (Math.random() > 0.5 ? 2 : 1) : (Math.random() > 0.4 ? 3 : 2);
+      for (let b = 0; b < numBlocked; b++) {
+        let l = Math.floor(Math.random() * 5);
+        if (l === lastLane) sameLaneStreak++; else sameLaneStreak = 0;
+        if (sameLaneStreak >= 2) { l = (l + 1) % 5; sameLaneStreak = 0; }
+        blockedLanes.add(l);
+        lastLane = l;
+      }
+      // 최소 2개 차선은 항상 개방 보장
+      while (blockedLanes.size > 3) blockedLanes.delete([...blockedLanes][0]);
+
+      blockedLanes.forEach(l => layout.push({ lane: l, z: z, type: 'wall' }));
+
+      // 빈 차선에 코인 배치 확률
+      const openLanes = [0,1,2,3,4].filter(l => !blockedLanes.has(l));
+      if (Math.random() > 0.45 && openLanes.length) {
+        const cl = openLanes[Math.floor(Math.random() * openLanes.length)];
+        layout.push({ lane: cl, z: z, type: 'coin' });
+      }
+
+      z -= minGap + Math.random() * 3;
+    }
+    return { layout, endZ: z };
+  }
+
+  // 가시 클러스터 — 어두운 금속 베이스 + 날카로운 빨간 촉, 경고 스트라이프 받침
+  function makeSpikeCluster() {
+    const group = new THREE.Group();
+    const spikeCount = 3 + Math.floor(Math.random() * 2);
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0x2a2a33, roughness: 0.55, metalness: 0.6, flatShading: true });
+    const tipMat = new THREE.MeshStandardMaterial({ color: 0xff2d3d, emissive: 0x7a0000, emissiveIntensity: 0.7, roughness: 0.25, metalness: 0.3, flatShading: true });
+
+    let maxH = 0;
+    for (let i = 0; i < spikeCount; i++) {
+      const h = 0.9 + Math.random() * 0.6;
+      maxH = Math.max(maxH, h);
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.16, h, 6), i === 0 ? tipMat : (Math.random() > 0.5 ? tipMat : baseMat));
+      const angle = (i / spikeCount) * Math.PI * 2 + Math.random() * 0.4;
+      const radius = i === 0 ? 0 : 0.16 + Math.random() * 0.1;
+      spike.position.set(Math.cos(angle) * radius, h / 2, Math.sin(angle) * radius);
+      spike.rotation.z = (Math.random() - 0.5) * 0.18;
+      spike.rotation.x = (Math.random() - 0.5) * 0.18;
+      spike.castShadow = true;
+      group.add(spike);
+
+      const edge = new THREE.LineSegments(
+        new THREE.EdgesGeometry(spike.geometry, 25),
+        new THREE.LineBasicMaterial({ color: 0xffb3b8, transparent: true, opacity: 0.5 })
+      );
+      spike.add(edge);
+    }
+
+    // 받침대 + 경고 스트라이프
+    const baseGeo = new THREE.CylinderGeometry(0.42, 0.46, 0.16, 16);
+    const base = new THREE.Mesh(baseGeo, new THREE.MeshStandardMaterial({ color: 0x1c1c22, roughness: 0.6, metalness: 0.5 }));
+    base.position.y = 0.08;
+    base.castShadow = true; base.receiveShadow = true;
+    group.add(base);
+    const stripeGeo = new THREE.TorusGeometry(0.43, 0.025, 6, 24);
+    const stripe = new THREE.Mesh(stripeGeo, new THREE.MeshBasicMaterial({ color: 0xffcf4d }));
+    stripe.rotation.x = Math.PI / 2;
+    stripe.position.y = 0.08;
+    group.add(stripe);
+
+    group.userData = { type: 'wall', h: maxH };
+    return group;
+  }
+
+  // 폭탄 — 검은 구체 + 점화된 도화선 + 경고 스트라이프, 펄스로 위협감 강조
+  function makeBomb() {
+    const group = new THREE.Group();
+    const bodyMat = new THREE.MeshPhysicalMaterial({ color: 0x14141a, roughness: 0.3, metalness: 0.55, clearcoat: 0.5, clearcoatRoughness: 0.2 });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.46, 24, 24), bodyMat);
+    body.position.y = 0.5;
+    body.castShadow = true;
+    group.add(body);
+
+    // 경고 스트라이프 (펄스 애니메이션 대상)
+    const stripeMat = new THREE.MeshBasicMaterial({ color: 0xff2d3d });
+    const stripe = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.05, 8, 28), stripeMat);
+    stripe.rotation.x = Math.PI / 2.4;
+    stripe.position.y = 0.5;
+    group.add(stripe);
+
+    // 도화선
+    const fuse = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.025, 0.035, 0.32, 6),
+      new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.8 })
+    );
+    fuse.position.set(0.05, 0.96, 0);
+    fuse.rotation.z = -0.35;
+    group.add(fuse);
+
+    // 점화 스파크 (펄스 발광)
+    const spark = new THREE.Mesh(
+      new THREE.SphereGeometry(0.07, 10, 10),
+      new THREE.MeshBasicMaterial({ color: 0xffcf4d })
+    );
+    spark.position.set(0.16, 1.12, 0);
+    group.add(spark);
+
+    group.userData = { type: 'wall', h: 1.0, isBomb: true, stripeMat, spark, phase: Math.random() * Math.PI * 2 };
+    return group;
+  }
+
+  function spawnChunk() {
+    const { layout, endZ } = generateChunk(spawnedZ, difficulty);
+    spawnedZ = endZ;
+
+    layout.forEach(item => {
+      if (item.type === 'wall') {
+        const mesh = Math.random() > 0.45 ? makeBomb() : makeSpikeCluster();
+        mesh.position.set(LANE_X[item.lane], 0, item.z);
+        mesh.rotation.y = Math.random() * Math.PI * 2;
+        scene.add(mesh);
+        obstacleMeshes.push(mesh);
+      } else {
+        const geo = new THREE.TorusGeometry(0.34, 0.13, 14, 32);
+        const mat = new THREE.MeshPhysicalMaterial({ color: 0xffcf4d, emissive: 0x6a4a00, emissiveIntensity: 0.6, metalness: 0.85, roughness: 0.12, clearcoat: 0.6 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(LANE_X[item.lane], 0.65, item.z);
+        mesh.rotation.x = Math.PI / 2;
+        mesh.castShadow = true;
+        mesh.userData = { type: 'coin', baseY: 0.65, spin: 0.06, phase: Math.random() * Math.PI * 2 };
+        scene.add(mesh);
+        coinMeshes.push(mesh);
+
+        // thin sparkle ring orbiting the coin
+        const sparkleGeo = new THREE.TorusGeometry(0.5, 0.008, 6, 24);
+        const sparkleMat = new THREE.MeshBasicMaterial({ color: 0xfff3c4, transparent: true, opacity: 0.55 });
+        const sparkle = new THREE.Mesh(sparkleGeo, sparkleMat);
+        sparkle.rotation.x = Math.PI / 3;
+        mesh.add(sparkle);
+      }
+    });
+
+    flashAiTag();
+  }
+
+  let aiTagTimeout;
+  function flashAiTag() {
+    const tag = document.getElementById('ai-tag');
+    tag.classList.add('show');
+    clearTimeout(aiTagTimeout);
+    aiTagTimeout = setTimeout(() => tag.classList.remove('show'), 1600);
+  }
+
+  // ---------- INPUT ----------
+  function moveLane(dir) {
+    targetLane = Math.max(0, Math.min(4, targetLane + dir));
+  }
+  document.getElementById('btn-left').addEventListener('click', () => moveLane(-1));
+  document.getElementById('btn-right').addEventListener('click', () => moveLane(1));
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft' || e.key === 'a') moveLane(-1);
+    if (e.key === 'ArrowRight' || e.key === 'd') moveLane(1);
+  });
+  let touchStartX = null;
+  renderer.domElement.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
+  renderer.domElement.addEventListener('touchend', (e) => {
+    if (touchStartX === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 40) moveLane(dx > 0 ? 1 : -1);
+    touchStartX = null;
+  });
+
+  // ---------- HUD ----------
+  function updateHUD() {
+    document.getElementById('score-val').textContent = Math.floor(distance);
+    document.getElementById('coin-val').textContent = coins;
+    document.getElementById('diff-val').textContent = difficulty;
+  }
+
+  // ---------- GAME LOOP ----------
+  function checkCollisions() {
+    for (let i = obstacleMeshes.length - 1; i >= 0; i--) {
+      const m = obstacleMeshes[i];
+      const dz = Math.abs(player.position.z - m.position.z);
+      const dx = Math.abs(player.position.x - m.position.x);
+      if (dz < 0.75 && dx < 0.75) {
+        return true;
+      }
+    }
+    for (let i = coinMeshes.length - 1; i >= 0; i--) {
+      const m = coinMeshes[i];
+      const dz = Math.abs(player.position.z - m.position.z);
+      const dx = Math.abs(player.position.x - m.position.x);
+      if (dz < 0.7 && dx < 0.7) {
+        scene.remove(m);
+        coinMeshes.splice(i, 1);
+        coins += 1;
+      }
+    }
+    return false;
+  }
+
+  function cleanupPassed() {
+    obstacleMeshes = obstacleMeshes.filter(m => {
+      if (m.position.z > player.position.z + 4) { scene.remove(m); return false; }
+      return true;
+    });
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+    if (!running) { renderer.render(scene, camera); return; }
+
+    // lane lerp
+    const tx = LANE_X[targetLane];
+    player.position.x += (tx - player.position.x) * 0.18;
+    lane = targetLane;
+
+    // forward motion
+    player.position.z -= speed;
+    distance += speed * 1.2;
+
+    // running cycle: legs/arms swing, body bounces
+    const runT = distance * 9; // 속도에 비례해 보폭 빨라짐
+    const swing = Math.sin(runT) * 0.85;
+    legL.rotation.x = swing;
+    legR.rotation.x = -swing;
+    armL.rotation.x = -swing * 0.7;
+    armR.rotation.x = swing * 0.7;
+    bodyGroup.position.y = Math.abs(Math.sin(runT)) * 0.07;
+    bodyGroup.rotation.z = Math.sin(runT) * 0.04; // 살짝 좌우로 흔들리는 생동감
+
+    // trail particles
+    trailCursor = (trailCursor + 1) % trailMeshes.length;
+    if (trailCursor === 0) {
+      const t = trailMeshes[0];
+      // shift life cycle: spawn a fresh particle at player position
+    }
+    const fresh = trailMeshes[Math.floor(distance * 3) % trailMeshes.length];
+    fresh.mesh.position.set(player.position.x, 0.35, player.position.z + 0.3);
+    fresh.mesh.material.opacity = 0.5;
+    fresh.life = 1;
+    trailMeshes.forEach(t => {
+      if (t.life > 0) {
+        t.life -= 0.04;
+        t.mesh.material.opacity = Math.max(t.life * 0.4, 0);
+        t.mesh.scale.setScalar(0.6 + t.life * 0.6);
+      }
+    });
+
+    // coin / obstacle animation
+    const time = performance.now() * 0.001;
+    coinMeshes.forEach(m => {
+      m.rotation.z += m.userData.spin;
+      m.position.y = m.userData.baseY + Math.sin(time * 2 + m.userData.phase) * 0.12;
+    });
+    obstacleMeshes.forEach(m => {
+      if (m.userData.isBomb) {
+        const pulse = 0.5 + Math.sin(time * 6 + m.userData.phase) * 0.5;
+        m.userData.stripeMat.color.setHSL(0, 1, 0.35 + pulse * 0.25);
+        m.userData.spark.scale.setScalar(0.7 + pulse * 0.6);
+      }
+    });
+
+    // dust drift toward camera, recycle
+    const dustAttr = dust.geometry.attributes.position;
+    for (let i = 0; i < dustCount; i++) {
+      let z = dustAttr.getZ(i) + speed * 0.5;
+      if (z > player.position.z + 10) z -= 200;
+      dustAttr.setZ(i, z);
+    }
+    dustAttr.needsUpdate = true;
+
+    // difficulty / speed ramp
+    difficulty = 1 + Math.floor(distance / 60);
+    speed = baseSpeed + Math.min(difficulty * 0.012, 0.18);
+
+    // chunk spawning
+    if (player.position.z < nextChunkAt + 40) {
+      spawnChunk();
+      nextChunkAt = spawnedZ;
+    }
+
+    // camera follow
+    camera.position.z = player.position.z + 8;
+    camera.position.x += (player.position.x * 0.3 - (camera.position.x - 0)) * 0.05;
+    camera.lookAt(player.position.x * 0.5, 0.5, player.position.z - 6);
+
+    sky.position.z = player.position.z;
+
+    cleanupPassed();
+    updateHUD();
+
+    if (checkCollisions()) {
+      endGame();
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  // ---------- GAME STATE ----------
+  function startGame() {
+    document.getElementById('start-overlay').classList.add('hidden');
+    document.getElementById('gameover-overlay').classList.add('hidden');
+    resetWorld();
+    spawnChunk();
+    nextChunkAt = spawnedZ;
+    running = true;
+  }
+
+  function endGame() {
+    running = false;
+    const finalDist = Math.floor(distance);
+    if (finalDist > myBest) {
+      myBest = finalDist;
+      document.getElementById('my-best').textContent = myBest + 'm';
+    }
+    document.getElementById('final-score').innerHTML = finalDist + 'm<small>이번 판 기록 · 코인 ' + coins + '개 획득</small>';
+    document.getElementById('result-msg').textContent =
+      finalDist < 100 ? '아직 몸이 덜 풀렸네요. 다시 도전해보세요.' :
+      finalDist < 300 ? '꽤 잘 달렸습니다. 다음 판엔 더 멀리 가볼까요?' :
+      '훌륭한 기록입니다! AI가 다음엔 더 어려운 패턴을 준비할 거예요.';
+    document.getElementById('gameover-overlay').classList.remove('hidden');
+  }
+
+  document.getElementById('start-btn').addEventListener('click', startGame);
+  document.getElementById('retry-btn').addEventListener('click', startGame);
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  animate();
+})();
+</script>
+</body>
+</html>
